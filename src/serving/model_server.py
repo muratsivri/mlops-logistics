@@ -8,7 +8,6 @@ import uvicorn
 from datetime import datetime
 import os
 
-# API modelleri
 class DeliveryPredictionRequest(BaseModel):
     customer_id: str
     product_category: str
@@ -36,14 +35,12 @@ class DeliveryPredictionResponse(BaseModel):
 class BatchPredictionRequest(BaseModel):
     predictions: List[DeliveryPredictionRequest]
 
-# FastAPI app
 app = FastAPI(
     title="Lojistik Teslimat Süresi Tahmin API",
     description="ML tabanlı teslimat süresi tahmin servisi",
     version="1.0.0"
 )
 
-# Global değişkenler
 model_artifacts = None
 feature_engineering = None
 
@@ -57,12 +54,10 @@ def load_model_artifacts(model_path="models/best_model.pkl"):
     with open(model_path, 'rb') as f:
         model_artifacts = pickle.load(f)
     
-    print(f"✅ Model yüklendi: {model_artifacts['model_type']}")
     return model_artifacts
 
 def prepare_features(request_data: Dict) -> pd.DataFrame:
     """API request'ini model için hazırla"""
-    # Temel özellikler
     features = {
         'order_value': request_data['order_value'],
         'items_count': request_data['items_count'],
@@ -73,7 +68,6 @@ def prepare_features(request_data: Dict) -> pd.DataFrame:
         'perishable': int(request_data['perishable'])
     }
     
-    # Tarih özellikleri
     if request_data.get('order_datetime'):
         dt = pd.to_datetime(request_data['order_datetime'])
     else:
@@ -84,12 +78,10 @@ def prepare_features(request_data: Dict) -> pd.DataFrame:
     features['is_weekend'] = int(dt.dayofweek in [5, 6])
     features['is_peak_hour'] = int(dt.hour in [11, 12, 17, 18, 19])
     
-    # Türetilmiş özellikler
     features['value_per_item'] = features['order_value'] / features['items_count']
     features['weight_per_item'] = features['weight_kg'] / features['items_count']
     features['volume_per_item'] = features['volume_cm3'] / features['items_count']
     
-    # Karmaşıklık skoru
     features['complexity_score'] = (
         features['items_count'] * 0.3 +
         features['weight_kg'] * 0.2 +
@@ -98,7 +90,6 @@ def prepare_features(request_data: Dict) -> pd.DataFrame:
         features['delivery_distance_km'] * 0.5
     )
     
-    # Trafik ve hava durumu etkileri
     traffic_impact = {'low': 1, 'medium': 1.5, 'high': 2.5}
     weather_impact = {'sunny': 1, 'cloudy': 1.2, 'rainy': 1.8, 'snowy': 2.5}
     
@@ -111,7 +102,6 @@ def prepare_features(request_data: Dict) -> pd.DataFrame:
         features['weather_impact']
     )
     
-    # Kategorik değişkenler için dummy değerler
     categorical_mappings = {
         'product_category': request_data['product_category'],
         'traffic_condition': request_data['traffic_condition'],
@@ -119,13 +109,10 @@ def prepare_features(request_data: Dict) -> pd.DataFrame:
         'payment_method': request_data['payment_method']
     }
     
-    # Tüm özellikleri DataFrame'e çevir
     df = pd.DataFrame([features])
     
-    # Model için gerekli tüm sütunları ekle (eksik olanlar 0)
     for feature_name in model_artifacts['feature_names']:
         if feature_name not in df.columns:
-            # Kategorik değişken kontrolü
             for cat_var, value in categorical_mappings.items():
                 if feature_name.startswith(f'{cat_var}_') and feature_name.endswith(value):
                     df[feature_name] = 1
@@ -133,7 +120,6 @@ def prepare_features(request_data: Dict) -> pd.DataFrame:
             else:
                 df[feature_name] = 0
     
-    # Sadece model özelliklerini seç ve sırala
     df = df[model_artifacts['feature_names']]
     
     return df
@@ -160,9 +146,7 @@ async def startup_event():
     """API başlangıçında modeli yükle"""
     try:
         load_model_artifacts()
-        print("🚀 API hazır!")
     except Exception as e:
-        print(f"❌ Model yükleme hatası: {e}")
 
 @app.get("/")
 async def root():
@@ -190,19 +174,14 @@ async def predict_delivery_time(request: DeliveryPredictionRequest):
         raise HTTPException(status_code=503, detail="Model henüz yüklenmedi")
     
     try:
-        # Özellikleri hazırla
         features_df = prepare_features(request.dict())
         
-        # Tahmin yap
         prediction = model_artifacts['model'].predict(features_df)[0]
         
-        # Güven aralığı (basit yaklaşım - gerçek uygulamada daha sofistike olmalı)
         confidence_margin = prediction * 0.15  # %15 margin
         
-        # Zorluk skoru
         difficulty_score = features_df['delivery_difficulty_score'].values[0]
         
-        # Öneriler
         recommendations = generate_recommendations(prediction, difficulty_score)
         
         return DeliveryPredictionResponse(
@@ -225,7 +204,6 @@ async def predict_batch(request: BatchPredictionRequest):
     results = []
     for pred_request in request.predictions:
         try:
-            # Her bir tahmin için predict endpoint'ini kullan
             result = await predict_delivery_time(pred_request)
             results.append({
                 "customer_id": pred_request.customer_id,
@@ -252,7 +230,6 @@ async def model_info():
     }
 
 if __name__ == "__main__":
-    # Development server
     uvicorn.run(
         "model_server:app",
         host="0.0.0.0",

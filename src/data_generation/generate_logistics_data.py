@@ -14,7 +14,6 @@ class LogisticsDataGenerator:
         self.n_warehouses = n_warehouses
         self.n_days = n_days
         
-        # Türkiye şehirleri ve ilçeleri
         self.cities = {
             "Istanbul": ["Kadıköy", "Üsküdar", "Beşiktaş", "Şişli", "Bakırköy", "Maltepe", "Kartal"],
             "Ankara": ["Çankaya", "Keçiören", "Mamak", "Yenimahalle", "Etimesgut"],
@@ -23,7 +22,6 @@ class LogisticsDataGenerator:
             "Antalya": ["Muratpaşa", "Kepez", "Konyaaltı"]
         }
         
-        # Ürün kategorileri
         self.product_categories = ["Elektronik", "Giyim", "Gıda", "Kitap", "Kozmetik", "Ev", "Spor", "Oyuncak"]
         
     def generate_customers(self):
@@ -61,7 +59,6 @@ class LogisticsDataGenerator:
         for day in range(self.n_days):
             current_date = start_date + timedelta(days=day)
             
-            # Günlük sipariş sayısı (hafta sonu ve özel günlerde farklı)
             if current_date.weekday() in [5, 6]:  # Hafta sonu
                 daily_orders = np.random.poisson(self.n_customers * 0.6)
             elif current_date.day in [11, 25]:  # İndirim günleri (11.11, ayın 25'i)
@@ -72,7 +69,6 @@ class LogisticsDataGenerator:
             for _ in range(daily_orders):
                 customer = customers_df.sample(1).iloc[0]
                 
-                # Sipariş zamanı (müşteri tercihine göre ağırlıklı)
                 if customer["preferred_delivery_time"] == "morning":
                     hour = np.random.choice(range(6, 12), p=[0.1, 0.2, 0.3, 0.25, 0.1, 0.05])
                 elif customer["preferred_delivery_time"] == "afternoon":
@@ -108,10 +104,8 @@ class LogisticsDataGenerator:
                     "order_status": "delivered"
                 }
                 
-                # Teslimat süresi simülasyonu
                 base_delivery_time = order["delivery_distance_km"] * 1.5  # Base: 1.5 saat/km
                 
-                # Faktörlerin etkisi
                 factors = {
                     "traffic": {"low": 1.0, "medium": 1.3, "high": 1.8},
                     "weather": {"sunny": 1.0, "cloudy": 1.1, "rainy": 1.4, "snowy": 2.0},
@@ -121,7 +115,6 @@ class LogisticsDataGenerator:
                     "time_of_day": 1.5 if hour in [17, 18, 19] else 1.0  # Akşam trafiği
                 }
                 
-                # Toplam teslimat süresi
                 total_factor = (factors["traffic"][order["traffic_condition"]] * 
                                factors["weather"][order["weather"]] * 
                                factors["fragile"] * 
@@ -132,7 +125,6 @@ class LogisticsDataGenerator:
                 order["actual_delivery_hours"] = base_delivery_time * total_factor + np.random.normal(0, 2)
                 order["actual_delivery_hours"] = max(0.5, order["actual_delivery_hours"])  # Min 30 dakika
                 
-                # Teslimat puanı hesaplama
                 delay_ratio = order["actual_delivery_hours"] / order["promised_delivery_hours"]
                 
                 if delay_ratio <= 0.5:  # Çok erken teslimat
@@ -246,35 +238,22 @@ class LogisticsDataGenerator:
         """Tüm veriyi kaydet"""
         os.makedirs(output_dir, exist_ok=True)
         
-        print("🔄 Veri üretimi başlıyor...")
         
-        # Veri üret
-        print("👥 Müşteri verisi üretiliyor...")
         customers_df = self.generate_customers()
         customers_df.to_csv(f"{output_dir}/customers.csv", index=False)
-        print(f"✅ {len(customers_df)} müşteri oluşturuldu")
         
-        print("📦 Sipariş verisi üretiliyor...")
         orders_df = self.generate_orders(customers_df)
         orders_df.to_csv(f"{output_dir}/orders.csv", index=False)
-        print(f"✅ {len(orders_df)} sipariş oluşturuldu")
         
-        print("🚚 Kurye verisi üretiliyor...")
         couriers_df = self.generate_couriers()
         couriers_df.to_csv(f"{output_dir}/couriers.csv", index=False)
-        print(f"✅ {len(couriers_df)} kurye oluşturuldu")
         
-        print("🏭 Depo verisi üretiliyor...")
         warehouses_df = self.generate_warehouses()
         warehouses_df.to_csv(f"{output_dir}/warehouses.csv", index=False)
-        print(f"✅ {len(warehouses_df)} depo oluşturuldu")
         
-        print("📍 Teslimat bölgesi verisi üretiliyor...")
         zones_df = self.generate_delivery_zones()
         zones_df.to_csv(f"{output_dir}/delivery_zones.csv", index=False)
-        print(f"✅ {len(zones_df)} teslimat bölgesi oluşturuldu")
         
-        # Özet istatistikler
         summary_stats = {
             "total_orders": len(orders_df),
             "total_customers": len(customers_df),
@@ -287,7 +266,6 @@ class LogisticsDataGenerator:
             "date_range": f"{orders_df['order_date'].min()} - {orders_df['order_date'].max()}"
         }
         
-        # Metadata kaydet
         metadata = {
             "generated_at": datetime.now().isoformat(),
             "parameters": {
@@ -302,18 +280,11 @@ class LogisticsDataGenerator:
         with open(f"{output_dir}/metadata.json", "w", encoding="utf-8") as f:
             json.dump(metadata, f, indent=2, ensure_ascii=False)
         
-        print("\n📊 Özet İstatistikler:")
-        print(f"  - Toplam Sipariş: {summary_stats['total_orders']:,}")
-        print(f"  - Ortalama Sipariş Değeri: ₺{summary_stats['avg_order_value']:.2f}")
-        print(f"  - Ortalama Teslimat Süresi: {summary_stats['avg_delivery_time']:.1f} saat")
-        print(f"  - Ortalama Müşteri Puanı: {summary_stats['avg_delivery_rating']:.2f}/5")
         
-        print(f"\n✅ Tüm veriler '{output_dir}' klasörüne kaydedildi!")
         
         return customers_df, orders_df, couriers_df, warehouses_df, zones_df
 
 if __name__ == "__main__":
-    # Veri üreticisini başlat
     generator = LogisticsDataGenerator(
         n_customers=1000,
         n_couriers=50,
@@ -321,5 +292,4 @@ if __name__ == "__main__":
         n_days=90
     )
     
-    # Veriyi üret ve kaydet
     generator.save_data()

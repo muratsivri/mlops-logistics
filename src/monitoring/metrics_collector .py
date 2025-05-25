@@ -11,7 +11,6 @@ import os
 from typing import Dict, List
 import sqlite3
 
-# Prometheus metrikleri
 prediction_counter = Counter('delivery_predictions_total', 'Toplam tahmin sayısı')
 prediction_latency = Histogram('prediction_latency_seconds', 'Tahmin süresi')
 prediction_error = Histogram('prediction_error_hours', 'Tahmin hatası (saat)')
@@ -33,7 +32,6 @@ class MonitoringService:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
-        # Tahmin logları tablosu
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS predictions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -47,7 +45,6 @@ class MonitoringService:
             )
         ''')
         
-        # Metrikler tablosu
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS metrics (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -58,7 +55,6 @@ class MonitoringService:
             )
         ''')
         
-        # Data drift tablosu
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS data_drift (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -93,7 +89,6 @@ class MonitoringService:
         conn.commit()
         conn.close()
         
-        # Prometheus metriklerini güncelle
         prediction_counter.inc()
     
     def log_metric(self, metric_name: str, metric_value: float, tags: Dict = None):
@@ -113,7 +108,6 @@ class MonitoringService:
         """Model performansını hesapla"""
         conn = sqlite3.connect(self.db_path)
         
-        # Son N gündeki tahminleri al
         query = '''
             SELECT predicted_hours, actual_hours, prediction_error
             FROM predictions
@@ -127,15 +121,12 @@ class MonitoringService:
         if len(df) == 0:
             return None
         
-        # Metrikler hesapla
         mae = np.mean(df['prediction_error'])
         rmse = np.sqrt(np.mean(df['prediction_error'] ** 2))
         mape = np.mean(np.abs(df['prediction_error'] / df['actual_hours'])) * 100
         
-        # Prometheus metriklerini güncelle
         model_accuracy.set(mae)
         
-        # MLflow'a logla
         with mlflow.start_run(run_name=f"monitoring_{datetime.now().strftime('%Y%m%d')}"):
             mlflow.log_metrics({
                 "monitoring_mae": mae,
@@ -154,7 +145,6 @@ class MonitoringService:
     def detect_data_drift(self, reference_data: pd.DataFrame, current_data: pd.DataFrame, 
                          feature_columns: List[str]):
         """Veri kayması tespiti"""
-        # Evidently report oluştur
         column_mapping = ColumnMapping(
             target='actual_delivery_hours',
             numerical_features=feature_columns
@@ -164,10 +154,8 @@ class MonitoringService:
         report.run(reference_data=reference_data, current_data=current_data, 
                   column_mapping=column_mapping)
         
-        # Sonuçları al
         result = report.as_dict()
         
-        # Drift skorlarını kaydet
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
@@ -182,7 +170,6 @@ class MonitoringService:
                     VALUES (?, ?, ?)
                 ''', (feature, drift_score, is_drifted))
                 
-                # Prometheus metriği
                 if is_drifted:
                     data_drift_score.set(drift_score)
         
@@ -197,7 +184,6 @@ class MonitoringService:
         
         conn = sqlite3.connect(self.db_path)
         
-        # Son 30 günlük tahmin performansı
         performance_query = '''
             SELECT DATE(timestamp) as date,
                    COUNT(*) as prediction_count,
@@ -213,7 +199,6 @@ class MonitoringService:
         
         performance_df = pd.read_sql_query(performance_query, conn)
         
-        # Data drift özeti
         drift_query = '''
             SELECT feature_name,
                    AVG(drift_score) as avg_drift_score,
@@ -229,7 +214,6 @@ class MonitoringService:
         
         conn.close()
         
-        # Rapor oluştur
         report = {
             "generated_at": datetime.now().isoformat(),
             "performance_summary": {
@@ -246,12 +230,10 @@ class MonitoringService:
             "drift_details": drift_df.to_dict('records')
         }
         
-        # JSON olarak kaydet
         report_path = os.path.join(output_path, f"monitoring_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json")
         with open(report_path, 'w') as f:
             json.dump(report, f, indent=2)
         
-        print(f"📊 Monitoring raporu oluşturuldu: {report_path}")
         
         return report
     
@@ -263,7 +245,6 @@ class MonitoringService:
         """Alert kontrolü"""
         alerts = []
         
-        # Model performans kontrolü
         performance = self.calculate_model_performance(last_n_days=1)
         if performance and performance['mae'] > 5:  # 5 saatten fazla ortalama hata
             alerts.append({
@@ -273,7 +254,6 @@ class MonitoringService:
                 "timestamp": datetime.now().isoformat()
             })
         
-        # Tahmin sayısı kontrolü
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
@@ -308,7 +288,6 @@ class ModelRegistry:
     def register_model(self, model_path: str, model_name: str, version: str, 
                       metrics: Dict, description: str = ""):
         """Modeli kaydet"""
-        # MLflow model registry
         with mlflow.start_run():
             mlflow.log_metrics(metrics)
             mlflow.sklearn.log_model(
@@ -317,7 +296,6 @@ class ModelRegistry:
                 registered_model_name=model_name
             )
         
-        # Local registry
         registry_info = {
             "model_name": model_name,
             "version": version,
@@ -331,28 +309,23 @@ class ModelRegistry:
         with open(registry_file, 'w') as f:
             json.dump(registry_info, f, indent=2)
         
-        print(f"✅ Model kaydedildi: {model_name} v{version}")
     
     def get_latest_model(self, model_name: str):
         """En son model versiyonunu al"""
-        # Registry dosyalarını kontrol et
         registry_files = [f for f in os.listdir(self.registry_path) 
                          if f.startswith(model_name) and f.endswith('.json')]
         
         if not registry_files:
             return None
         
-        # En son versiyonu bul
         latest_file = sorted(registry_files)[-1]
         
         with open(os.path.join(self.registry_path, latest_file), 'r') as f:
             return json.load(f)
 
 if __name__ == "__main__":
-    # Monitoring servisi örnek kullanım
     monitor = MonitoringService()
     
-    # Örnek tahmin logu
     monitor.log_prediction(
         customer_id="CUST_00001",
         predicted_hours=24.5,
@@ -360,15 +333,10 @@ if __name__ == "__main__":
         actual_hours=26.0
     )
     
-    # Performans hesapla
     performance = monitor.calculate_model_performance()
     if performance:
-        print(f"Model Performansı: {performance}")
     
-    # Monitoring raporu oluştur
     report = monitor.generate_monitoring_report()
     
-    # Alert kontrolü
     alerts = monitor.alert_check()
     if alerts:
-        print(f"⚠️ Aktif alertler: {alerts}")

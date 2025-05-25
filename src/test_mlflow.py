@@ -35,5 +35,3 @@ with mlflow.start_run(run_name="test-run"):
  
     mlflow.sklearn.log_model(model, "model")
     
-    print(f"Model eğitildi! Train accuracy: {train_score:.3f}, Test accuracy: {test_score:.3f}")
-    print(f"MLflow UI'da görüntülemek için: http://localhost:5000")
