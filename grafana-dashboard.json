@@ -1,0 +1,117 @@
+﻿{
+  "dashboard": {
+    "id": null,
+    "title": "MLOps Logistics Dashboard",
+    "tags": ["mlops", "logistics"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Model Prediction Latency",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(prediction_latency_seconds_bucket[5m]))",
+            "legendFormat": "95th percentile"
+          },
+          {
+            "expr": "histogram_quantile(0.50, rate(prediction_latency_seconds_bucket[5m]))",
+            "legendFormat": "50th percentile"
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Total Predictions",
+        "type": "stat",
+        "gridPos": {"x": 12, "y": 0, "w": 6, "h": 4},
+        "targets": [
+          {
+            "expr": "delivery_predictions_total",
+            "legendFormat": "Total Predictions"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Model Accuracy (MAE)",
+        "type": "gauge",
+        "gridPos": {"x": 18, "y": 0, "w": 6, "h": 4},
+        "targets": [
+          {
+            "expr": "model_accuracy_mae",
+            "legendFormat": "MAE"
+          }
+        ],
+        "options": {
+          "minValue": 0,
+          "maxValue": 10,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"value": 0, "color": "green"},
+              {"value": 5, "color": "yellow"},
+              {"value": 8, "color": "red"}
+            ]
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "Prediction Errors Distribution",
+        "type": "heatmap",
+        "gridPos": {"x": 0, "y": 8, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "rate(prediction_error_hours_bucket[5m])",
+            "format": "heatmap"
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "API Response Time",
+        "type": "graph",
+        "gridPos": {"x": 12, "y": 8, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "rate(http_request_duration_seconds_sum[5m]) / rate(http_request_duration_seconds_count[5m])",
+            "legendFormat": "Average Response Time"
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Data Drift Score",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 16, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "data_drift_score",
+            "legendFormat": "Drift Score"
+          }
+        ],
+        "alert": {
+          "name": "High Data Drift",
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [0.7],
+                "type": "gt"
+              },
+              "query": {
+                "params": ["A", "5m", "now"]
+              },
+              "reducer": {
+                "params": [],
+                "type": "avg"
+              },
+              "type": "query"
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

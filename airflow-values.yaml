@@ -1,0 +1,68 @@
+# Airflow Without PVC
+executor: LocalExecutor
+
+# Web UI
+webserver:
+  service:
+    type: NodePort
+    ports:
+      - name: airflow-ui
+        port: 8080
+        nodePort: 30002
+  defaultUser:
+    enabled: true
+    role: Admin
+    username: admin
+    email: admin@example.com
+    firstName: admin
+    lastName: user
+    password: admin123
+
+# Scheduler
+scheduler:
+  replicas: 1
+
+# Disable components we don't need
+flower:
+  enabled: false
+  
+statsd:
+  enabled: false
+
+pgbouncer:
+  enabled: false
+
+redis:
+  enabled: false
+
+triggerer:
+  enabled: false
+
+# PostgreSQL
+postgresql:
+  enabled: true
+  auth:
+    postgresPassword: postgres
+    database: airflow
+
+# IMPORTANT: Disable persistence
+dags:
+  persistence:
+    enabled: false
+  gitSync:
+    enabled: false
+
+logs:
+  persistence:
+    enabled: false
+
+workers:
+  persistence:
+    enabled: false
+
+# Create config for single node
+config:
+  core:
+    load_examples: 'True'
+  webserver:
+    expose_config: 'True'

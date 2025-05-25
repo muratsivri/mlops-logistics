@@ -1,0 +1,67 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv
+
+# MLflow
+mlruns/
+mlflow.db
+artifacts/
+
+# Data
+data/raw/*
+data/processed/*
+data/features/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!data/features/.gitkeep
+
+# Models
+models/*.pkl
+models/*.h5
+models/*.pt
+!models/.gitkeep
+
+# Logs
+logs/
+*.log
+airflow/logs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+.env
+docker-compose.override.yml
+
+# Kubernetes
+kubeconfig*
+*.pem
+*.key
+
+# Monitoring
+monitoring/metrics.db
+monitoring/reports/*
+!monitoring/reports/.gitkeep
+
+# Temporary
+*.tmp
+*.temp
+.cache/
+
+# Credentials
+*credentials*
+*secrets*
